@@ -27,7 +27,7 @@ resource "aws_key_pair" "project" {
 # Amazon S3
 # -----------------------------
 resource "aws_s3_bucket" "mys3statebucket" {
-  bucket = "my-tf-state-project-abdallah-bucket"
+  bucket = "my-tf-state-project-fortstack-bucket"
 
   tags = {
     Name        = "My bucket"
@@ -67,7 +67,7 @@ resource "aws_internet_gateway" "gw" {
 
 resource "aws_nat_gateway" "gw" {
   allocation_id = aws_eip.nat_eip.id
-  subnet_id     = module.pub_sub_2.puplic_subnet_id_1
+  subnet_id     = module.pub_sub_1.puplic_subnet_id_1
   depends_on = [ aws_eip.nat_eip ]
   tags = {
     Name = "NAT GW"
@@ -232,14 +232,42 @@ resource "aws_instance" "proxy" {
   instance_type               = "t2.micro"
   subnet_id                   = module.pub_sub_1.puplic_subnet_id_1
   vpc_security_group_ids      = [aws_security_group.frontEndTraffic.id]
-  key_name                    = "project"
+  key_name                    = aws_key_pair.project.key_name
 
   tags = {
     Name = "Proxy Server"
   }
 
+
   provisioner "file" {
-    source      = "proxy-script.sh"
+  source      = "~/.ssh/id_rsa"
+  destination = "/home/ec2-user/.ssh/id_rsa"
+
+  connection {
+    type        = "ssh"
+    user        = "ec2-user"
+    private_key = file("~/.ssh/id_rsa") 
+    host        = self.public_ip
+  }
+}
+
+
+provisioner "remote-exec" {
+  inline = [
+    "chmod 600 /home/ec2-user/.ssh/id_rsa",
+    "ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub"
+  ]
+
+  connection {
+    type        = "ssh"
+    user        = "ec2-user"
+    private_key = file("~/.ssh/id_rsa")
+    host        = self.public_ip
+  }
+}
+
+  provisioner "file" {
+    source      = "proxyscript.sh"
     destination = "/tmp/script.sh"
 
     connection {
@@ -284,17 +312,20 @@ resource "aws_instance" "proxy" {
 # Backend EC2 Instance - Flask app with bastion access via proxy
 resource "aws_instance" "backend" {
   ami                         = data.aws_ami.amz-ami.image_id
-  instance_type               = "t2.micro"
+  instance_type               = "t3.medium"
   subnet_id                   = module.priv_sub_1.private_subnet_id
-  private_ip = "10.0.1.10/24"
+  private_ip = "10.0.1.10"
   vpc_security_group_ids      = [aws_security_group.backEndTraffic.id]
-  key_name                    = "project"
+  key_name                    = aws_key_pair.project.key_name
 
   tags = {
     Name = "Backend Server"
   }
 
-  
+  root_block_device {
+    volume_size = 20  # <-- Increase from 8 to 20 GB (or more)
+    volume_type = "gp2"
+  }
 
   provisioner "file" {
     source      = "backend-script.sh"
@@ -314,7 +345,10 @@ resource "aws_instance" "backend" {
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/script.sh",
-      "/tmp/script.sh"
+      "/tmp/script.sh",
+      "sudo yum install -y cloud-utils-growpart",
+      "sudo growpart /dev/nvme0n1 1",
+      "sudo xfs_growfs /"
     ]
 
     connection {
@@ -335,38 +369,96 @@ resource "aws_instance" "backend" {
   depends_on = [aws_instance.proxy]
 }
 
+resource "null_resource" "add_known_host" {
+  provisioner "local-exec" {
+    command = "ssh-keyscan -H ${aws_instance.proxy.public_ip} >> ~/.ssh/known_hosts"
+  }
+
+  depends_on = [aws_instance.proxy]
+}
 
 resource "null_resource" "nginx_setup" {
   provisioner "file" {
     source      = "ansible-exec.sh"
-    destination = "/tmp/ansible"
+    destination = "/tmp/ansible/ansible-exec.sh"
 
     connection {
       type        = "ssh"
       user        = "ec2-user"
       private_key = file("~/.ssh/id_rsa")
       host        = aws_instance.proxy.public_ip
+      timeout     = "2m"
+      agent       = false
     }
   }
+
   provisioner "remote-exec" {
     inline = [
       "sudo chmod +x /tmp/ansible/ansible-exec.sh",
-      "chmod +x /tmp/script.sh",
-      "/tmp/script.sh"
+      "/tmp/ansible/ansible-exec.sh"
     ]
+
     connection {
       type        = "ssh"
       user        = "ec2-user"
       private_key = file("~/.ssh/id_rsa")
       host        = aws_instance.proxy.public_ip
+      timeout     = "2m"
+      agent       = false
     }
   }
 
   depends_on = [
     aws_instance.proxy,
-    aws_instance.backend
+    aws_instance.backend,
+    null_resource.add_known_host
   ]
 }
+
+# resource "null_resource" "nginx_setup" {
+#   provisioner "file" {
+#     source      = "ansible-exec.sh"
+#     destination = "/tmp/ansible/ansible-exec.sh"
+
+#     connection {
+#       type        = "ssh"
+#       user        = "ec2-user"
+#       private_key = file("~/.ssh/id_rsa")
+#       host        = aws_instance.proxy.public_ip
+#     }
+#   }
+#   provisioner "remote-exec" {
+#     inline = [
+#       "sudo chmod +x /tmp/ansible/ansible-exec.sh",
+#       "chmod +x /tmp/ansible/ansible-exec.sh",
+#       "/tmp/ansible/ansible-exec.sh"
+#     ]
+#     connection {
+#       type        = "ssh"
+#       user        = "ec2-user"
+#       private_key = file("~/.ssh/id_rsa")
+#       host        = aws_instance.proxy.public_ip
+
+
+#  # This is the key line ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+#       bastion_host = null
+#       timeout      = "2m"
+#       agent        = false
+
+#       # Disable strict host key checking
+#       ssh_opts = [
+#         "-o StrictHostKeyChecking=no",
+#         "-o UserKnownHostsFile=/dev/null"
+#       ]
+      
+#     }
+#   }
+
+#   depends_on = [
+#     aws_instance.proxy,
+#     aws_instance.backend
+#   ]
+# }
 
 # # -----------------------------
 # # Internal Load Balancer

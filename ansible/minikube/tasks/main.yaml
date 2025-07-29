@@ -98,7 +98,7 @@
   register: minikube_home
 
 - name: Start Minikube with docker driver
-  shell: minikube start --driver=docker
+  shell: sg docker -c "minikube start --driver=docker"
   become: false
   environment:
     PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

@@ -12,9 +12,8 @@ server {
         proxy_pass http://192.168.49.2:30080;
     }
 }
-}
 EOF
-sleep 2
+sleep 5
 sudo systemctl reload nginx
 
 

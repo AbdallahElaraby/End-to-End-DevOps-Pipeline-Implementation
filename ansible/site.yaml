@@ -4,8 +4,4 @@
   roles:
      - nfsserver
      - docker
-     - kubernetes
-     - minikube
-     - helm
-     - argocd
-     - app
+

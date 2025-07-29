@@ -11,7 +11,7 @@
 - name: create a directory for nfs mounts
   become: no
   file:
-        path: /home/abdallah/statefulset/nfs
+        path: /home/ec2-user/statefulset/nfs
         state: directory
         mode: '0755' 
         recurse: yes
@@ -19,26 +19,26 @@
 - name: Ensure mongo-0 directory
   become: no
   file:
-        path: /home/abdallah/statefulset/nfs/mongo-0
+        path: /home/ec2-user/statefulset/nfs/mongo-0
         state: directory
         mode: '0755' 
 - name: Ensure mongo-1 directory
   become: no
   file:
-        path: /home/abdallah/statefulset/nfs/mongo-1
+        path: /home/ec2-user/statefulset/nfs/mongo-1
         state: directory
         mode: '0755' 
 
 - name: Ensure mongo-2 directory
   become: no
   file:
-        path: /home/abdallah/statefulset/nfs/mongo-2
+        path: /home/ec2-user/statefulset/nfs/mongo-2
         state: directory
         mode: '0755' 
 - name: Add exports entry for NFS directory
   lineinfile:
         path: /etc/exports
-        line: "/home/abdallah/statefulset/nfs *(rw,sync,no_root_squash)"
+        line: "/home/ec2-user/statefulset/nfs *(rw,sync,no_root_squash)"
         create: yes
         state: present
         insertafter: EOF
