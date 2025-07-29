@@ -1,0 +1,20 @@
+- name: Run docker command via newgrp
+  become: false
+  shell: |
+    newgrp docker <<EOF
+    docker info
+    EOF
+
+
+- name: Download Helm tarball
+  get_url:
+    url: https://get.helm.sh/helm-v3.18.4-linux-amd64.tar.gz
+    dest: /tmp/helm.tar.gz
+
+- name: Extract Helm tarball
+  unarchive:
+    src: /tmp/helm.tar.gz
+    dest: /tmp/
+    remote_src: yes
+- name: Move Helm binary to /usr/local/bin
+  command: mv /tmp/linux-amd64/helm /usr/local/bin/helm

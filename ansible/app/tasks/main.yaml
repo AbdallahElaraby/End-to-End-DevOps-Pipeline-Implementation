@@ -1,0 +1,53 @@
+- name: Run docker command via newgrp
+  become: false
+  shell: |
+    newgrp docker <<EOF
+    docker info
+    EOF
+
+
+- name: Install git
+  yum:
+    name: git
+    state: present
+- name: Install nfs
+  yum:
+    name: nfs-utils
+    state: present
+- name: start and enable nfs
+  service:
+    name: nfs-server.service
+    state: started
+    enabled: true
+- name: Clone GitOps repo
+  git:
+    repo: "https://github.com/AbdallahElaraby/Todo-List-nodejs-GitOps.git"
+    dest: "/opt/todo-list-gitops"
+    force: yes
+
+- name: Apply ArgoCD manifests
+  become: false
+  shell:  /usr/local/bin/kubectl apply -f /opt/todo-list-gitops/argocd/application.yaml
+  register: apply_output
+- name: Port-forward ArgoCD server
+  become: false
+  shell: |
+      /usr/local/bin/kubectl port-forward svc/argocd-server -n argocd 8080:80 > /tmp/argocd-port-forward.log 2>&1 &
+  async: 1
+  poll: 0
+- name: Wait for localhost:8080
+  wait_for:
+    port: 8080
+    host: 127.0.0.1
+    timeout: 60
+
+- name: Retrieve ArgoCD admin password
+  become: false
+  shell: |
+    /usr/local/bin/kubectl -n argocd get secret argocd-initial-admin-secret \
+    -o jsonpath="{.data.password}" | base64 -d
+  register: admin_password
+
+- name: Show ArgoCD admin password
+  debug:
+    msg: "ArgoCD admin password is: {{ admin_password.stdout }}"

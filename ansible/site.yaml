@@ -1,0 +1,11 @@
+- name: Install Docker, kubectl, and Minikube on Rocky Linux
+  hosts: all
+  become: true
+  roles:
+     - nfsserver
+     - docker
+     - kubernetes
+     - minikube
+     - helm
+     - argocd
+     - app
