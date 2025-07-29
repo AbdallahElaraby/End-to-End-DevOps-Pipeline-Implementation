@@ -85,6 +85,13 @@ module "pub_sub_1" {
   Name              = "Puplic Subnet 1"
   availability_zone = "us-east-1a"
 }
+module "pub_sub_2" {
+  source            = "./modules/subnet_mod_pup"
+  cidr_block        = "10.0.2.0/24"
+  vpc_id            = module.vpc.project_vpc-id
+  Name              = "Puplic Subnet 2"
+  availability_zone = "us-east-1b"
+}
 
 
 # -----------------------------
@@ -122,6 +129,10 @@ resource "aws_route_table" "route_tab2" {
 
 resource "aws_route_table_association" "a" {
   subnet_id      = module.pub_sub_1.puplic_subnet_id_1
+  route_table_id = module.route_table.route_table_id
+}
+resource "aws_route_table_association" "b" {
+  subnet_id      = module.pub_sub_2.puplic_subnet_id_1
   route_table_id = module.route_table.route_table_id
 }
 resource "aws_route_table_association" "c" {
@@ -222,11 +233,6 @@ data "aws_ami" "amz-ami" {
 # -----------------------------
 # EC2 Instance
 # -----------------------------
-# -----------------------------
-# EC2 Instances (Flat, No Modules, No Variables)
-# -----------------------------
-
-# Proxy EC2 Instance - with Ansible installation
 resource "aws_instance" "proxy" {
   ami                         = data.aws_ami.amz-ami.image_id
   instance_type               = "t2.micro"
@@ -250,8 +256,6 @@ resource "aws_instance" "proxy" {
     host        = self.public_ip
   }
 }
-
-
 provisioner "remote-exec" {
   inline = [
     "chmod 600 /home/ec2-user/.ssh/id_rsa",
@@ -265,7 +269,6 @@ provisioner "remote-exec" {
     host        = self.public_ip
   }
 }
-
   provisioner "file" {
     source      = "proxyscript.sh"
     destination = "/tmp/script.sh"
@@ -307,9 +310,6 @@ provisioner "remote-exec" {
     command = "echo Proxy Public IP: ${self.public_ip} >> all_ips.txt"
   }
 }
-
-
-# Backend EC2 Instance - Flask app with bastion access via proxy
 resource "aws_instance" "backend" {
   ami                         = data.aws_ami.amz-ami.image_id
   instance_type               = "t3.medium"
@@ -323,7 +323,7 @@ resource "aws_instance" "backend" {
   }
 
   root_block_device {
-    volume_size = 20  # <-- Increase from 8 to 20 GB (or more)
+    volume_size = 20  
     volume_type = "gp2"
   }
 
@@ -415,146 +415,43 @@ resource "null_resource" "nginx_setup" {
   ]
 }
 
-# resource "null_resource" "nginx_setup" {
-#   provisioner "file" {
-#     source      = "ansible-exec.sh"
-#     destination = "/tmp/ansible/ansible-exec.sh"
-
-#     connection {
-#       type        = "ssh"
-#       user        = "ec2-user"
-#       private_key = file("~/.ssh/id_rsa")
-#       host        = aws_instance.proxy.public_ip
-#     }
-#   }
-#   provisioner "remote-exec" {
-#     inline = [
-#       "sudo chmod +x /tmp/ansible/ansible-exec.sh",
-#       "chmod +x /tmp/ansible/ansible-exec.sh",
-#       "/tmp/ansible/ansible-exec.sh"
-#     ]
-#     connection {
-#       type        = "ssh"
-#       user        = "ec2-user"
-#       private_key = file("~/.ssh/id_rsa")
-#       host        = aws_instance.proxy.public_ip
-
-
-#  # This is the key line ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-#       bastion_host = null
-#       timeout      = "2m"
-#       agent        = false
-
-#       # Disable strict host key checking
-#       ssh_opts = [
-#         "-o StrictHostKeyChecking=no",
-#         "-o UserKnownHostsFile=/dev/null"
-#       ]
-      
-#     }
-#   }
-
-#   depends_on = [
-#     aws_instance.proxy,
-#     aws_instance.backend
-#   ]
-# }
-
-# # -----------------------------
-# # Internal Load Balancer
-# # -----------------------------
-# resource "aws_lb" "BE_LB" {
-#   name               = "BackEnd-LB"
-#   internal           = true
-#   load_balancer_type = "application"
-#   security_groups    = [aws_security_group.backEndTraffic.id]
-#   subnets            = [ module.priv_sub_1.private_subnet_id,module.priv_sub_2.private_subnet_id]
-
-#   enable_deletion_protection = false
-
-#   tags = {
-#     Environment = "production"
-#   }
-#   provisioner "local-exec" {
-#     command = "echo Internal LB DNS ${self.dns_name} >> all_ips.txt"
-#   }
-# }
-
-# resource "aws_lb_target_group" "BE_Target_Group" {
-#   name     = "BackEnd-TG"
-#   port     = 5000
-#   protocol = "HTTP"
-#   vpc_id   = module.vpc.project_vpc-id
-# }
-
-# resource "aws_lb_target_group_attachment" "BE_TG_Attach" {
-#   depends_on = [ module.backend_instance ]
-#   target_group_arn = aws_lb_target_group.BE_Target_Group.arn
-#   target_id        = module.backend_instance.instance_id
-#   port             = 5000
-# }
-
-# resource "aws_lb_target_group_attachment" "BE_TG_Attach2" {
-#   depends_on = [ module.backend_instance2 ]
-#   target_group_arn = aws_lb_target_group.BE_Target_Group.arn
-#   target_id        = module.backend_instance2.instance_id
-#   port             = 5000
-# }
-
-# resource "aws_lb_listener" "BackEnd_l" {
-#   load_balancer_arn = aws_lb.BE_LB.arn
-#   port              = "5000"
-#   protocol          = "HTTP"
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.BE_Target_Group.arn
-#   }
-# }
-# # -----------------------------
-# # Internet Facing Load Balancer
-# # -----------------------------
-# resource "aws_lb" "FE_LB" {
-#   name               = "FrontEnd-LB"
-#   internal           = false
-#   load_balancer_type = "application"
-#   security_groups    = [aws_security_group.frontEndTraffic.id]
-#   subnets            = [module.pub_sub_1.puplic_subnet_id_1, module.pub_sub_2.puplic_subnet_id_1]
-#   enable_deletion_protection = false
-#   tags = {
-#     Environment = "production"
-#   }
-#   provisioner "local-exec" {
-#     command = "echo  LB Puplic DNS:  ${self.dns_name} >> all_ips.txt"
-#   }
+# -----------------------------
+# Internet Facing Load Balancer
+# -----------------------------
+resource "aws_lb" "FE_LB" {
+  name               = "FrontEnd-LB"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.frontEndTraffic.id]
+  subnets            = [module.pub_sub_1.puplic_subnet_id_1,module.pub_sub_2.puplic_subnet_id_1]
+  enable_deletion_protection = false
+  tags = {
+    Environment = "production"
+  }
+  provisioner "local-exec" {
+    command = "echo  LB Puplic DNS:  ${self.dns_name} >> all_ips.txt"
+  }
   
-# }
-# resource "aws_lb_target_group" "FE_TG" {
-#   name     = "FrontEnd-TG"
-#   port     = 80
-#   protocol = "HTTP"
-#   vpc_id   = module.vpc.project_vpc-id
-# }
-# resource "aws_lb_target_group_attachment" "FE_TG_ATTACH" {
-#   depends_on = [ module.proxy_instance.instance_id ]
-#   target_group_arn = aws_lb_target_group.FE_TG.arn
-#   target_id        = module.proxy_instance.instance_id
-#   port             = 80
-# }
-# resource "aws_lb_target_group_attachment" "FE_TG_ATTACH_2" {
-#   depends_on = [ module.proxy_instance2.instance_id ]
-#   target_group_arn = aws_lb_target_group.FE_TG.arn
-#   target_id        = module.proxy_instance2.instance_id 
-#   port             = 80
-# }
-# resource "aws_lb_listener" "FE_L" {
-#   load_balancer_arn = aws_lb.FE_LB.arn
-#   port              = "80"
-#   protocol          = "HTTP"
-#   # ssl_policy        = "ELBSecurityPolicy-2016-08"
-#   # certificate_arn   = "arn:aws:iam::187416307283:server-certificate/test_cert_rab3wuqwgja25ct3n4jdj2tzu4"
+}
+resource "aws_lb_target_group" "FE_TG" {
+  name     = "FrontEnd-TG"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = module.vpc.project_vpc-id
+}
+resource "aws_lb_target_group_attachment" "FE_TG_ATTACH" {
+  depends_on = [ aws_instance.proxy ]
+  target_group_arn = aws_lb_target_group.FE_TG.arn
+  target_id        = aws_instance.proxy.id
+  port             = 80
+}
 
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.FE_TG.arn
-#   }
-# }
+resource "aws_lb_listener" "FE_L" {
+  load_balancer_arn = aws_lb.FE_LB.arn
+  port              = "80"
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.FE_TG.arn
+  }
+}
