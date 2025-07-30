@@ -46,10 +46,12 @@ This repository contains the complete infrastructure setup and automation for de
 
 ```
 FortStack-Internship/
-├── terraform/                # Terraform modules and configuration for AWS infra
-├── ansible/                  # Ansible playbooks for provisioning private EC2 instances
-├── inventory/                # Ansible inventory with bastion and private IPs
+├── ansible/                  # Ansible playbooks for provisioning private EC2 instancesinfra
+├── modules/                  # Terraform modules and configuration for AWS 
 ├── scripts/                  # Helper scripts (e.g., for SSH or bootstrapping)
+├── provider.tf               # This file is used to declare and configure the providers required by the Terraform configuration
+├── backend.tf                # This file defines the backend configuration for storing Terraform's state file
+├── main.tf                   # This file typically contains the primary infrastructure definitions,
 ├── README.md                 # Project overview and setup instructions
 └── .gitignore
 ```
