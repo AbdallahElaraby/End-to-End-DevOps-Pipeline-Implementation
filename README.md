@@ -69,7 +69,7 @@ FortStack-Internship/
 2. **Ansible** configures private instances **via bastion host** using `ansible_ssh_common_args` and provisions:
    - Docker and NFS server
    - Minikube + kubectl + Helm + ArgoCD
-   - ArgoCD setup for GitOps deployment from [todo-list-gitops](https://github.com/AbdallahElaraby/todo-list-gitops)
+   - ArgoCD setup for GitOps deployment from [todo-list-gitops](https://github.com/AbdallahElaraby/Todo-List-nodejs-GitOps)
 
 3. **Reverse Proxy Flow**:
    - Internal NGINX reverse proxy on the private instance forwards requests to NodePort service
