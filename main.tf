@@ -233,7 +233,7 @@ data "aws_ami" "amz-ami" {
 # -----------------------------
 # EC2 Instance
 # -----------------------------
-resource "aws_instance" "proxy" {
+resource "aws_instance" "bastion_host" {
   ami                         = data.aws_ami.amz-ami.image_id
   instance_type               = "t2.micro"
   subnet_id                   = module.pub_sub_1.puplic_subnet_id_1
@@ -270,7 +270,7 @@ provisioner "remote-exec" {
   }
 }
   provisioner "file" {
-    source      = "proxyscript.sh"
+    source      = "scripts/bastionhost.sh"
     destination = "/tmp/script.sh"
 
     connection {
@@ -328,7 +328,7 @@ resource "aws_instance" "backend" {
   }
 
   provisioner "file" {
-    source      = "backend-script.sh"
+    source      = "scripts/backend-script.sh"
     destination = "/tmp/script.sh"
 
     connection {
@@ -336,7 +336,7 @@ resource "aws_instance" "backend" {
       user                = "ec2-user"
       private_key         = file("~/.ssh/id_rsa")
       host                = self.private_ip
-      bastion_host        = aws_instance.proxy.public_ip
+      bastion_host        = aws_instance.bastion_host.public_ip
       bastion_user        = "ec2-user"
       bastion_private_key = file("~/.ssh/id_rsa")
     }
@@ -356,7 +356,7 @@ resource "aws_instance" "backend" {
       user                = "ec2-user"
       private_key         = file("~/.ssh/id_rsa")
       host                = self.private_ip
-      bastion_host        = aws_instance.proxy.public_ip
+      bastion_host        = aws_instance.bastion_host.public_ip
       bastion_user        = "ec2-user"
       bastion_private_key = file("~/.ssh/id_rsa")
     }
@@ -366,27 +366,27 @@ resource "aws_instance" "backend" {
     command = "echo Backend Private IP: ${self.private_ip} >> all_ips.txt"
   }
 
-  depends_on = [aws_instance.proxy]
+  depends_on = [aws_instance.bastion_host]
 }
 
 resource "null_resource" "add_known_host" {
   provisioner "local-exec" {
-    command = "ssh-keyscan -H ${aws_instance.proxy.public_ip} >> ~/.ssh/known_hosts"
+    command = "ssh-keyscan -H ${aws_instance.bastion_host.public_ip} >> ~/.ssh/known_hosts"
   }
 
-  depends_on = [aws_instance.proxy]
+  depends_on = [aws_instance.bastion_host]
 }
 
 resource "null_resource" "nginx_setup" {
   provisioner "file" {
-    source      = "ansible-exec.sh"
+    source      = "scripts/ansible-exec.sh"
     destination = "/tmp/ansible/ansible-exec.sh"
 
     connection {
       type        = "ssh"
       user        = "ec2-user"
       private_key = file("~/.ssh/id_rsa")
-      host        = aws_instance.proxy.public_ip
+      host        = aws_instance.bastion_host.public_ip
       timeout     = "2m"
       agent       = false
     }
@@ -402,14 +402,14 @@ resource "null_resource" "nginx_setup" {
       type        = "ssh"
       user        = "ec2-user"
       private_key = file("~/.ssh/id_rsa")
-      host        = aws_instance.proxy.public_ip
+      host        = aws_instance.bastion_host.public_ip
       timeout     = "2m"
       agent       = false
     }
   }
 
   depends_on = [
-    aws_instance.proxy,
+    aws_instance.bastion_host,
     aws_instance.backend,
     null_resource.add_known_host
   ]
@@ -440,9 +440,9 @@ resource "aws_lb_target_group" "FE_TG" {
   vpc_id   = module.vpc.project_vpc-id
 }
 resource "aws_lb_target_group_attachment" "FE_TG_ATTACH" {
-  depends_on = [ aws_instance.proxy ]
+  depends_on = [ aws_instance.bastion_host ]
   target_group_arn = aws_lb_target_group.FE_TG.arn
-  target_id        = aws_instance.proxy.id
+  target_id        = aws_instance.bastion_host.id
   port             = 80
 }
 
