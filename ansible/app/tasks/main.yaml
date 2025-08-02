@@ -1,9 +1,3 @@
-- name: Run docker command via newgrp
-  become: false
-  shell: |
-    newgrp docker <<EOF
-    docker info
-    EOF
 
 
 - name: Install git
