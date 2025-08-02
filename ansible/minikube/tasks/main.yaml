@@ -25,19 +25,25 @@
     executable: /bin/bash
   when: not minikube_home.stat.exists
 
-- name: Wait for Minikube kube-apiserver to be ready
-  shell: kubectl wait --for=condition=Ready nodes --timeout=180s
-  environment:
-    KUBECONFIG: /home/{{ ansible_user }}/.kube/config
+- name: Create patched metrics-server manifest
+  shell: |
+    curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml | \
+    sed 's/args:/args:\n        - --kubelet-insecure-tls/' > /tmp/metrics-server-patched.yaml
+  args:
+    executable: /bin/bash
   become: false
 
-- name: Check if metrics-server is already installed
-  command: kubectl get deployment metrics-server -n kube-system
-  register: metrics_server_check
-  failed_when: false
-  changed_when: false
-
-- name: Install metrics server if not present
-  shell: /usr/local/bin/kubectl apply -f --validate=false https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml --validate=false
+- name: Install metrics server with TLS verification disabled
+  shell: |
+    export KUBECONFIG=/home/{{ ansible_user }}/.kube/config
+    kubectl apply -f /tmp/metrics-server-patched.yaml --validate=false
+  args:
+    executable: /bin/bash
   become: false
-  when: "'NotFound' in metrics_server_check.stderr or metrics_server_check.rc != 0"
+
+- name: Verify metrics-server is healthy
+  shell: |
+    kubectl wait --for=condition=Ready pod -l k8s-app=metrics-server -n kube-system --timeout=180s
+  args:
+    executable: /bin/bash
+  become: false
