@@ -8,3 +8,4 @@ terraform.tfstate.backup
 .terraform/providers/registry.terraform.io/hashicorp/null/3.2.4/linux_amd64/LICENSE.txt
 .terraform/providers/registry.terraform.io/hashicorp/null/3.2.4/linux_amd64/terraform-provider-null_v3.2.4_x5
 .terraform/modules/modules.json
+.terraform/

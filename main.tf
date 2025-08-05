@@ -27,7 +27,7 @@ resource "aws_key_pair" "project" {
 # Amazon S3
 # -----------------------------
 resource "aws_s3_bucket" "mys3statebucket" {
-  bucket = "my-tf-state-project-fortstack-bucket"
+  bucket = "my-tf-state-project-fortstack-finaldemo-bucket"
 
   tags = {
     Name        = "My bucket"
