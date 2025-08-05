@@ -13,9 +13,7 @@
   args:
     creates: ~/.cache/helm/repository/argo-index.yaml
 
-- name: Update Helm repositories
-  become: false
-  command: /usr/local/bin/helm repo update
+
 
 - name: Create namespace argocd
   become: false
@@ -35,11 +33,6 @@
   command: /usr/local/bin/helm install argocd argo/argo-cd --namespace argocd
   when: argocd_status.rc != 0
 
-- name: Upgrade ArgoCD using Helm (if already installed)
-  become: false
-  command: /usr/local/bin/helm upgrade argocd argo/argo-cd --namespace argocd
-  when: argocd_status.rc == 0
-
 - name: Port-forward ArgoCD UI to localhost
   become: false
   shell: |
@@ -53,16 +46,3 @@
     until /usr/local/bin/kubectl get pods -n argocd | grep argocd-server | grep Running; do sleep 5; done
   args:
     executable: /bin/bash
-
-- name: Retrieve ArgoCD initial admin password
-  become: false
-  shell: |
-    /usr/local/bin/kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-  register: argocd_admin_pass
-  changed_when: false
-
-- name: Show ArgoCD admin password
-  become: false
-  debug:
-    msg: "ArgoCD UI available at http://localhost:8080 — username: admin, password: {{ argocd_admin_pass.stdout }}"
-
