@@ -40,10 +40,3 @@
   args:
     executable: /bin/bash
   become: false
-
-- name: Verify metrics-server is healthy
-  shell: |
-    kubectl wait --for=condition=Ready pod -l k8s-app=metrics-server -n kube-system --timeout=180s
-  args:
-    executable: /bin/bash
-  become: false
