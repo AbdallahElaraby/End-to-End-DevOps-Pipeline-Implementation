@@ -19,13 +19,4 @@
     msg: |
       Docker is installed and your user was added to the docker group.
       Run 'newgrp docker' or log out and log back in for changes to take effect.
-# - name: Confirm docker group is active in shell
-#   become: true
-#   shell: |
-#     sg docker -c "docker version"
-#   register: docker_group_test
-#   ignore_errors: true
 
-# - name: Show docker group access result
-#   debug:
-#     var: docker_group_test.stdout_lines
