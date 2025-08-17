@@ -1,6 +1,6 @@
 # ☁️ FortStack Internship – AWS Infrastructure Automation with Terraform, Ansible & Kubernetes
 
-This repository contains the complete infrastructure setup and automation for deploying a Kubernetes-based application stack on AWS. The architecture is designed with security, automation, and GitOps principles in mind — provisioning the environment with **Terraform**, configuring instances with **Ansible**, and deploying applications with **ArgoCD**.
+This repository contains the complete infrastructure setup and automation for deploying a Kubernetes-based application stack on AWS. The architecture is designed with security, automation, and GitOps principles in mind — provisioning the environment with **Terraform**, configuring instances with **Ansible**, and deploying applications with **ArgoCD**. 
 
 ---
 
